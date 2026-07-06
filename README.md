@@ -50,8 +50,8 @@ Credenciales por defecto:
 ```powershell
 $env:DATABASE_URL = "postgres://visualizador:visualizador@localhost:5432/visualizador"
 $env:RABBITMQ_URL = "amqp://visualizador:visualizador@localhost:5672/%2f"
-$env:RABBITMQ_QUEUE = "bike_trips"
-$env:RABBITMQ_PREFETCH = "10"
+$env:QUEUE_NAME = "bike_trips"
+$env:RABBIT_PREFETCH = "1"
 $env:HTTP_BIND = "127.0.0.1:3000"
 $env:APP_ENV = "dev"
 $env:LOG_FORMAT = "pretty"
@@ -74,18 +74,18 @@ La migracion inicial crea:
 
 ## Formato esperado de mensajes RabbitMQ
 
-La cola por defecto es `bike_trips`. La logica de consumo se implementara en una etapa posterior, pero el contrato esperado para eventos JSON es:
+La cola por defecto es `bike_trips`, configurable con `QUEUE_NAME`. El consumer usa `RABBIT_PREFETCH` para limitar mensajes sin confirmar. El contrato esperado para eventos JSON es:
 
 ```json
 {
-  "tipo": "retiro",
-  "bicicleta_id": "bike-001",
-  "estacion_id": "station-001",
-  "timestamp": "2026-07-05T23:00:00Z"
+  "id_recorrido": 1,
+  "id_usuario": 1,
+  "operacion": "retiro",
+  "fechahora": "2026-06-08T15:34:20Z"
 }
 ```
 
-Para devoluciones, `tipo` usa `devolucion` con los mismos campos base.
+`operacion` acepta `retiro` o `devolucion`. `id_recorrido` e `id_usuario` pueden llegar como numero o string numerico.
 
 ## Comandos de desarrollo
 

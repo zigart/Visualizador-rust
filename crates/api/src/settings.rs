@@ -6,8 +6,8 @@ use serde::Deserialize;
 pub struct AppConfig {
     pub database_url: String,
     pub rabbitmq_url: String,
-    pub rabbitmq_queue: String,
-    pub rabbitmq_prefetch: u16,
+    pub queue_name: String,
+    pub rabbit_prefetch: u16,
     pub http_bind: String,
     pub app_env: String,
     pub log_format: String,
@@ -24,8 +24,8 @@ impl AppConfig {
                 "rabbitmq_url",
                 "amqp://visualizador:visualizador@localhost:5672/%2f",
             )?
-            .set_default("rabbitmq_queue", "bike_trips")?
-            .set_default("rabbitmq_prefetch", 10)?
+            .set_default("queue_name", "bike_trips")?
+            .set_default("rabbit_prefetch", 1)?
             .set_default("http_bind", "127.0.0.1:3000")?
             .set_default("app_env", "dev")?
             .set_default("log_format", "pretty")?

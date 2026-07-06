@@ -32,7 +32,7 @@ El consumer deshabilitara auto-ack. Si el handler retorna `Ok(())`, se enviara A
 
 ### Reconexión
 
-La conexion `lapin` se configurara con auto recovery habilitado. Si el broker cae y vuelve, el consumer debe recuperar la conexion y reanudar la suscripcion.
+El consumer ejecutara un loop de reconexion alrededor de `lapin`. Si el broker cae o el stream termina, se logueara el error, se esperara un intervalo breve y se volvera a conectar para reanudar la suscripcion.
 
 ### Prefetch
 
@@ -41,5 +41,5 @@ El canal aplicara `basic_qos` con `RABBIT_PREFETCH`, default `1`, para limitar m
 ## Risks / Trade-offs
 
 - Reencolar errores de parseo puede generar retry infinito -> se acepta por ahora porque la spec pide `requeue=true`; una evolucion futura puede agregar DLQ.
-- Auto recovery depende del comportamiento de `lapin` y del estado del canal -> agregar logs claros y tests de integracion cuando el broker este disponible.
+- La reconexion depende de detectar errores del stream o del canal -> agregar logs claros y tests de integracion cuando el broker este disponible.
 - Sin persistencia final, el handler inicial puede ser un stub verificable -> mantener el contrato para conectar dominio/persistencia en cambios siguientes.

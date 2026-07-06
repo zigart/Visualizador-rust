@@ -7,7 +7,9 @@ name = "adaptadores"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "dominio",
+ "futures-lite 2.6.1",
  "lapin",
  "serde",
  "serde_json",
@@ -509,7 +511,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
+ "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -776,6 +781,7 @@ checksum = "780955b8b195a21ab8e4ac6b60dd1dbdcec1dc6c51c0617964b08c81785e12c9"
 name = "dominio"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "thiserror 1.0.69",
 ]
 

@@ -18,6 +18,7 @@ sqlx.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
 tower.workspace = true

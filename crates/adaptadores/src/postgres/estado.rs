@@ -39,7 +39,10 @@ where
     let en_uso: i32 = row.try_get("en_uso")?;
     let maximo_historico: i32 = row.try_get("maximo_historico")?;
 
-    Ok(EstadoBicicletas::new(en_uso as u64, maximo_historico as u64))
+    Ok(EstadoBicicletas::new(
+        en_uso as u64,
+        maximo_historico as u64,
+    ))
 }
 
 async fn actualizar_estado_executor<'e, E>(

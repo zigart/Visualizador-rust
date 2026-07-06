@@ -40,10 +40,7 @@ impl PersistenciaMovimientos {
             .await
             .map_err(|error| ErrorPersistencia::base_datos(error.into()))?;
 
-        match self
-            .persistir_movimiento_en_tx(&mut tx, movimiento)
-            .await
-        {
+        match self.persistir_movimiento_en_tx(&mut tx, movimiento).await {
             Ok(estado) => {
                 tx.commit()
                     .await
@@ -88,8 +85,7 @@ impl PersistenciaMovimientos {
                 .await
                 .map_err(ErrorPersistencia::base_datos)?;
 
-        let repositorio =
-            RepositorioRecorridoEnTransaccion::new(existe_id, movimientos_usuario);
+        let repositorio = RepositorioRecorridoEnTransaccion::new(existe_id, movimientos_usuario);
         let nuevo_estado = SistemaBicicletas::new(repositorio)
             .procesar(movimiento, estado_actual)
             .map_err(ErrorPersistencia::Dominio)?;

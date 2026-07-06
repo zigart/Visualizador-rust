@@ -47,10 +47,7 @@ pub async fn insertar_movimiento(
     insertar_movimiento_executor(conn, movimiento).await
 }
 
-async fn existe_id_recorrido_executor<'e, E>(
-    executor: E,
-    id_recorrido: u64,
-) -> anyhow::Result<bool>
+async fn existe_id_recorrido_executor<'e, E>(executor: E, id_recorrido: u64) -> anyhow::Result<bool>
 where
     E: Executor<'e, Database = Postgres>,
 {

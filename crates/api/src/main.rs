@@ -3,12 +3,13 @@
 mod dashboard;
 mod operations;
 mod settings;
+mod sumologic;
 mod usuarios;
 
 use adaptadores::{
     rabbitmq::{consume_forever, RabbitMqPublisherSettings, RabbitMqSettings},
     validacion_mensajes::parse_movimiento_payload,
-    PersistenciaMovimientos,
+    PersistenciaMovimientos, ProcessingOutcome,
 };
 use anyhow::Result;
 use dashboard::{publicar_estado_dashboard, DashboardState, VistaEstadoMemoria};
@@ -18,8 +19,8 @@ use serde_json::Value;
 use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::broadcast};
-use tracing::{error, info};
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing::{error, info, warn};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 use usuarios::UsuariosState;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -78,8 +79,15 @@ async fn main() -> Result<()> {
                 let movimiento = match parse_movimiento_payload(&payload) {
                     Ok(movimiento) => movimiento,
                     Err(error) => {
-                        log_error_dominio(&payload, &error.to_string());
-                        return Err(error.into());
+                        log_error_validacion(
+                            &payload,
+                            "parseo",
+                            &error.to_string(),
+                            None,
+                            None,
+                            None,
+                        );
+                        return ProcessingOutcome::ValidationError;
                     }
                 };
                 let operacion = operacion_label(movimiento.operacion);
@@ -93,25 +101,27 @@ async fn main() -> Result<()> {
 
                 let nuevo_estado = match persistencia.persistir_movimiento(&movimiento).await {
                     Ok(estado) => estado,
+                    Err(error) if error.es_error_dominio() => {
+                        log_error_validacion(
+                            &payload,
+                            "dominio",
+                            &error.to_string(),
+                            Some(movimiento.id_recorrido),
+                            Some(movimiento.id_usuario),
+                            Some(operacion),
+                        );
+                        return ProcessingOutcome::ValidationError;
+                    }
                     Err(error) => {
-                        if error.es_error_dominio() {
-                            error!(
-                                id_recorrido = movimiento.id_recorrido,
-                                id_usuario = movimiento.id_usuario,
-                                operacion = %operacion,
-                                error = %error,
-                                "error de dominio procesando mensaje"
-                            );
-                        } else {
-                            tracing::error!(
-                                id_recorrido = movimiento.id_recorrido,
-                                id_usuario = movimiento.id_usuario,
-                                operacion = %operacion,
-                                error = %error,
-                                "error persistiendo movimiento"
-                            );
-                        }
-                        return Err(error.into());
+                        error!(
+                            event = "error_infraestructura",
+                            id_recorrido = movimiento.id_recorrido,
+                            id_usuario = movimiento.id_usuario,
+                            operacion = %operacion,
+                            error = %error,
+                            "error transitorio persistiendo movimiento"
+                        );
+                        return ProcessingOutcome::TransientError;
                     }
                 };
 
@@ -119,12 +129,12 @@ async fn main() -> Result<()> {
                     publicar_estado_dashboard(&dashboard_state, movimiento.clone(), nuevo_estado)
                         .await
                 {
-                    tracing::error!(
+                    warn!(
                         id_recorrido = movimiento.id_recorrido,
                         id_usuario = movimiento.id_usuario,
                         operacion = %operacion,
                         error = %error,
-                        "error publicando estado dashboard"
+                        "error publicando estado dashboard; movimiento ya persistido"
                     );
                 }
 
@@ -134,7 +144,7 @@ async fn main() -> Result<()> {
                     operacion = %operacion,
                     "fin procesamiento de movimiento"
                 );
-                Ok(())
+                ProcessingOutcome::Success
             }
         })
         .await
@@ -148,37 +158,86 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn log_error_dominio(payload: &[u8], mensaje: &str) {
+fn log_error_validacion(
+    payload: &[u8],
+    origen: &'static str,
+    mensaje: &str,
+    id_recorrido: Option<u64>,
+    id_usuario: Option<u64>,
+    operacion: Option<&str>,
+) {
     let value = serde_json::from_slice::<Value>(payload).ok();
-    let id_recorrido = value
-        .as_ref()
-        .and_then(|value| value.get("id_recorrido"))
-        .map(Value::to_string);
-    let id_usuario = value
-        .as_ref()
-        .and_then(|value| value.get("id_usuario"))
-        .map(Value::to_string);
-    let operacion = value
-        .as_ref()
-        .and_then(|value| value.get("operacion"))
-        .map(Value::to_string);
+    let id_recorrido = id_recorrido.map(|id| id.to_string()).or_else(|| {
+        value
+            .as_ref()
+            .and_then(|value| value.get("id_recorrido"))
+            .map(Value::to_string)
+    });
+    let id_usuario = id_usuario.map(|id| id.to_string()).or_else(|| {
+        value
+            .as_ref()
+            .and_then(|value| value.get("id_usuario"))
+            .map(Value::to_string)
+    });
+    let operacion = operacion.map(str::to_string).or_else(|| {
+        value
+            .as_ref()
+            .and_then(|value| value.get("operacion"))
+            .map(Value::to_string)
+    });
 
     error!(
+        event = "validacion_movimiento",
+        origen = origen,
         id_recorrido = id_recorrido.as_deref().unwrap_or(""),
         id_usuario = id_usuario.as_deref().unwrap_or(""),
         operacion = operacion.as_deref().unwrap_or(""),
         error = %mensaje,
-        "error de dominio procesando mensaje"
+        "error de validacion procesando mensaje"
     );
 }
 
 fn init_tracing(config: &settings::AppConfig) {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let use_sumologic = config
+        .sumologic_endpoint
+        .as_ref()
+        .is_some_and(|endpoint| !endpoint.is_empty());
+
+    if use_sumologic {
+        let endpoint = config.sumologic_endpoint.clone().unwrap_or_default();
+        let source_name = config
+            .sumologic_source_name
+            .clone()
+            .unwrap_or_else(|| "visualizador-rust".to_string());
+        let sumo_layer = sumologic::SumoLogicLayer::new(endpoint, source_name);
+
+        if config.log_format == "json" {
+            Registry::default()
+                .with(filter)
+                .with(sumo_layer)
+                .with(fmt::layer().json())
+                .init();
+        } else {
+            Registry::default()
+                .with(filter)
+                .with(sumo_layer)
+                .with(fmt::layer().pretty())
+                .init();
+        }
+        return;
+    }
 
     if config.log_format == "json" {
-        fmt().with_env_filter(filter).json().init();
+        Registry::default()
+            .with(filter)
+            .with(fmt::layer().json())
+            .init();
     } else {
-        fmt().with_env_filter(filter).pretty().init();
+        Registry::default()
+            .with(filter)
+            .with(fmt::layer().pretty())
+            .init();
     }
 }
 

@@ -32,18 +32,24 @@ pub enum BrokerConfirmation {
     NackRequeue,
 }
 
-pub fn confirmation_for_result<T, E>(result: &Result<T, E>) -> BrokerConfirmation {
-    if result.is_ok() {
-        BrokerConfirmation::Ack
-    } else {
-        BrokerConfirmation::NackRequeue
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessingOutcome {
+    Success,
+    ValidationError,
+    TransientError,
+}
+
+pub fn confirmation_for_outcome(outcome: ProcessingOutcome) -> BrokerConfirmation {
+    match outcome {
+        ProcessingOutcome::Success | ProcessingOutcome::ValidationError => BrokerConfirmation::Ack,
+        ProcessingOutcome::TransientError => BrokerConfirmation::NackRequeue,
     }
 }
 
 pub async fn consume_forever<H, Fut>(settings: RabbitMqSettings, handler: H) -> !
 where
     H: Fn(Vec<u8>) -> Fut + Clone + Send + Sync + 'static,
-    Fut: Future<Output = Result<()>> + Send + 'static,
+    Fut: Future<Output = ProcessingOutcome> + Send + 'static,
 {
     loop {
         if let Err(error) = consume_once(settings.clone(), handler.clone()).await {
@@ -103,7 +109,7 @@ pub async fn publish_message(settings: &RabbitMqPublisherSettings, payload: Vec<
 async fn consume_once<H, Fut>(settings: RabbitMqSettings, handler: H) -> Result<()>
 where
     H: Fn(Vec<u8>) -> Fut + Clone + Send + Sync + 'static,
-    Fut: Future<Output = Result<()>> + Send + 'static,
+    Fut: Future<Output = ProcessingOutcome> + Send + 'static,
 {
     let connection = Connection::connect(
         &settings.url,
@@ -158,21 +164,22 @@ where
     while let Some(delivery) = consumer.next().await {
         let delivery = delivery.context("error recibiendo mensaje RabbitMQ")?;
         let payload = delivery.data.clone();
-        let processed = handler(payload).await;
+        let outcome = handler(payload).await;
 
-        match confirmation_for_result(&processed) {
+        match confirmation_for_outcome(outcome) {
             BrokerConfirmation::Ack => {
                 delivery
                     .ack(BasicAckOptions::default())
                     .await
                     .context("fallo enviando ACK a RabbitMQ")?;
-                info!("mensaje RabbitMQ confirmado con ACK");
+                if outcome == ProcessingOutcome::ValidationError {
+                    warn!("mensaje RabbitMQ confirmado con ACK tras error de validacion");
+                } else {
+                    info!("mensaje RabbitMQ confirmado con ACK");
+                }
             }
             BrokerConfirmation::NackRequeue => {
-                if let Err(error) = &processed {
-                    error!(error = %error, "fallo el procesamiento del mensaje RabbitMQ");
-                }
-
+                error!("fallo transitorio procesando mensaje RabbitMQ; NACK requeue");
                 delivery
                     .nack(BasicNackOptions {
                         multiple: false,
@@ -190,21 +197,28 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{confirmation_for_result, BrokerConfirmation};
+    use super::{confirmation_for_outcome, BrokerConfirmation, ProcessingOutcome};
 
     #[test]
-    fn confirma_ack_cuando_el_resultado_es_exitoso() {
-        let result: anyhow::Result<()> = Ok(());
-
-        assert_eq!(confirmation_for_result(&result), BrokerConfirmation::Ack);
+    fn confirma_ack_cuando_el_procesamiento_es_exitoso() {
+        assert_eq!(
+            confirmation_for_outcome(ProcessingOutcome::Success),
+            BrokerConfirmation::Ack
+        );
     }
 
     #[test]
-    fn confirma_nack_requeue_cuando_el_resultado_es_error() {
-        let result: anyhow::Result<()> = Err(anyhow::anyhow!("fallo"));
-
+    fn confirma_ack_cuando_hay_error_de_validacion() {
         assert_eq!(
-            confirmation_for_result(&result),
+            confirmation_for_outcome(ProcessingOutcome::ValidationError),
+            BrokerConfirmation::Ack
+        );
+    }
+
+    #[test]
+    fn confirma_nack_requeue_cuando_hay_error_transitorio() {
+        assert_eq!(
+            confirmation_for_outcome(ProcessingOutcome::TransientError),
             BrokerConfirmation::NackRequeue
         );
     }

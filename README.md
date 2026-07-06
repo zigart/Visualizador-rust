@@ -57,9 +57,20 @@ $env:OPERATOR_PASSWORD = "visualizador"
 $env:HTTP_BIND = "127.0.0.1:3000"
 $env:APP_ENV = "dev"
 $env:LOG_FORMAT = "pretty"
+# Opcional: envio de logs ERROR a Sumo Logic (fallback a consola si falla o no esta configurado)
+# $env:SUMOLOGIC_ENDPOINT = "https://collectors.sumologic.com/receiver/v1/http/..."
+# $env:SUMOLOGIC_SOURCE_NAME = "visualizador-rust"
 ```
 
 Tambien se puede copiar `.env.example` a `.env` para desarrollo local.
+
+## Politica ACK en errores de validacion
+
+Los mensajes con error de parseo o reglas de negocio se confirman (ACK) y se loguean con `event=validacion_movimiento`. Los errores transitorios de base de datos usan NACK con requeue.
+
+## Observabilidad (Sumo Logic)
+
+Con `SUMOLOGIC_ENDPOINT` configurado, los eventos `ERROR` se envian por HTTP a Sumo Logic de forma asincrona. La consola sigue recibiendo los mismos logs via `tracing` (`LOG_FORMAT=pretty` o `json`). Si el endpoint no responde, el evento queda disponible en consola.
 
 ## Migraciones
 

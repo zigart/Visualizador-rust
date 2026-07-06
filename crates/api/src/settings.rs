@@ -13,6 +13,8 @@ pub struct AppConfig {
     pub http_bind: String,
     pub app_env: String,
     pub log_format: String,
+    pub sumologic_endpoint: Option<String>,
+    pub sumologic_source_name: Option<String>,
 }
 
 impl AppConfig {
@@ -33,6 +35,8 @@ impl AppConfig {
             .set_default("http_bind", "127.0.0.1:3000")?
             .set_default("app_env", "dev")?
             .set_default("log_format", "pretty")?
+            .set_default("sumologic_endpoint", Option::<String>::None)?
+            .set_default("sumologic_source_name", Option::<String>::None)?
             .add_source(config::Environment::default())
             .build()
             .context("no se pudo cargar la configuracion")?

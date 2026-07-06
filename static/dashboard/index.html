@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visualizador</title>
+    <link rel="stylesheet" href="/dashboard/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <header class="header">
+        <h1>Visualizador</h1>
+        <span id="estado-conexion" class="status">Conectando</span>
+      </header>
+
+      <section class="indicators" aria-label="Indicadores">
+        <article class="metric">
+          <span>Disponibles</span>
+          <strong id="bicicletas-disponibles">0</strong>
+        </article>
+        <article class="metric">
+          <span>En uso</span>
+          <strong id="bicicletas-en-uso">0</strong>
+        </article>
+        <article class="metric wide">
+          <span>Ultima actualizacion</span>
+          <strong id="ultima-actualizacion">Sin datos</strong>
+        </article>
+      </section>
+
+      <section class="history" aria-label="Historial de eventos">
+        <h2>Historial de eventos</h2>
+        <ol id="historial-eventos"></ol>
+      </section>
+    </main>
+
+    <script src="/dashboard/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+[package]
+name = "api"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+adaptadores = { path = "../adaptadores" }
+anyhow.workspace = true
+axum.workspace = true
+config.workspace = true
+dominio = { path = "../dominio" }
+dotenvy.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

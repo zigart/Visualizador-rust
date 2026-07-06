@@ -1,9 +1,9 @@
 ## 1. Workspace y dependencias
 
-- [ ] 1.1 Crear `Cargo.toml` raiz con workspace para `crates/dominio`, `crates/adaptadores` y `crates/api`.
-- [ ] 1.2 Crear los crates `dominio`, `adaptadores` y `api` con estructura inicial.
-- [ ] 1.3 Configurar dependencias necesarias para dominio, adaptadores y API.
-- [ ] 1.4 Verificar que `cargo build` compila el workspace inicial.
+- [x] 1.1 Crear `Cargo.toml` raiz con workspace para `crates/dominio`, `crates/adaptadores` y `crates/api`.
+- [x] 1.2 Crear los crates `dominio`, `adaptadores` y `api` con estructura inicial.
+- [x] 1.3 Configurar dependencias necesarias para dominio, adaptadores y API.
+- [x] 1.4 Verificar que `cargo build` compila el workspace inicial.
 
 ## 2. Dominio
 
@@ -15,8 +15,8 @@
 
 ## 3. PostgreSQL y migraciones
 
-- [ ] 3.1 Agregar directorio `migrations/` compatible con `sqlx`.
-- [ ] 3.2 Crear migracion inicial para tablas `recorridos` y `estado_bicicletas`.
+- [x] 3.1 Agregar directorio `migrations/` compatible con `sqlx`.
+- [x] 3.2 Crear migracion inicial para tablas `recorridos` y `estado_bicicletas`.
 - [ ] 3.3 Implementar adaptador PostgreSQL para los puertos de dominio.
 - [ ] 3.4 Asegurar operaciones transaccionales para abrir/cerrar recorridos y actualizar estado actual.
 - [ ] 3.5 Agregar tests de persistencia para migraciones y operaciones principales.
@@ -31,7 +31,7 @@
 
 ## 5. API y WebSocket
 
-- [ ] 5.1 Implementar configuracion de la API por variables de entorno.
+- [x] 5.1 Implementar configuracion de la API por variables de entorno.
 - [ ] 5.2 Crear servidor `axum` con endpoint de salud y endpoint WebSocket nativo.
 - [ ] 5.3 Implementar canal broadcast en memoria para actualizaciones de dashboard.
 - [ ] 5.4 Integrar dominio, PostgreSQL, RabbitMQ y broadcast en el binario `api`.
@@ -39,14 +39,14 @@
 
 ## 6. Entorno local y documentacion
 
-- [ ] 6.1 Crear `docker-compose.yml` con PostgreSQL y RabbitMQ para desarrollo local.
-- [ ] 6.2 Documentar variables de entorno requeridas y valores default.
-- [ ] 6.3 Actualizar README con instrucciones para levantar servicios, aplicar migraciones, ejecutar tests y correr la API.
-- [ ] 6.4 Documentar el formato esperado de mensajes RabbitMQ.
+- [x] 6.1 Crear `docker-compose.yml` con PostgreSQL y RabbitMQ para desarrollo local.
+- [x] 6.2 Documentar variables de entorno requeridas y valores default.
+- [x] 6.3 Actualizar README con instrucciones para levantar servicios, aplicar migraciones, ejecutar tests y correr la API.
+- [x] 6.4 Documentar el formato esperado de mensajes RabbitMQ.
 
 ## 7. Verificacion final
 
-- [ ] 7.1 Ejecutar `cargo fmt` sobre el workspace.
-- [ ] 7.2 Ejecutar `cargo build` desde la raiz.
-- [ ] 7.3 Ejecutar `cargo test` desde la raiz.
-- [ ] 7.4 Validar el change con `openspec validate`.
+- [x] 7.1 Ejecutar `cargo fmt` sobre el workspace.
+- [x] 7.2 Ejecutar `cargo build` desde la raiz.
+- [x] 7.3 Ejecutar `cargo test` desde la raiz.
+- [x] 7.4 Validar el change con `openspec validate`.

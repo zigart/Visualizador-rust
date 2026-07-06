@@ -37,6 +37,7 @@ Write-Host "Initial state: $initial"
 $payload = @{
     id_recorrido = (Get-Random -Minimum 100000 -Maximum 999999)
     id_usuario = 1
+    id_estacion = 10
     operacion = "retiro"
     fechahora = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 } | ConvertTo-Json -Compress

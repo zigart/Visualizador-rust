@@ -333,6 +333,7 @@ mod tests {
         MovimientoRecorrido {
             id_recorrido,
             id_usuario,
+            id_estacion: Some(100 + id_recorrido),
             operacion,
             fechahora: Utc.with_ymd_and_hms(2026, 7, dia, 12, 0, 0).unwrap(),
         }

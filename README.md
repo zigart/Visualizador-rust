@@ -82,12 +82,13 @@ La cola por defecto es `bike_trips`, configurable con `QUEUE_NAME`. El consumer 
 {
   "id_recorrido": 1,
   "id_usuario": 1,
+  "id_estacion": 10,
   "operacion": "retiro",
   "fechahora": "2026-06-08T15:34:20Z"
 }
 ```
 
-`operacion` acepta `retiro` o `devolucion`. `id_recorrido` e `id_usuario` pueden llegar como numero o string numerico.
+`operacion` acepta `retiro` o `devolucion`. `id_recorrido`, `id_usuario` e `id_estacion` pueden llegar como numero o string numerico. `id_estacion` es opcional hasta cerrar el contrato final con Procesador.
 
 ## Endpoints operativos
 
@@ -105,7 +106,7 @@ Invoke-RestMethod `
   -Method Post `
   -Headers @{ "X-Usuario" = "visualizador"; "X-Contrasena" = "visualizador" } `
   -ContentType "application/json" `
-  -Body '{"id_recorrido":1,"id_usuario":1,"operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}'
+  -Body '{"id_recorrido":1,"id_usuario":1,"id_estacion":10,"operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}'
 ```
 
 ## Imagen Docker

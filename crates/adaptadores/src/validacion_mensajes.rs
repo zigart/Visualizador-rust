@@ -16,6 +16,7 @@ pub fn parse_movimiento_payload(payload: &[u8]) -> Result<MovimientoRecorrido, E
 
     let id_recorrido = parse_required_id(object.get("id_recorrido"), "id_recorrido")?;
     let id_usuario = parse_required_id(object.get("id_usuario"), "id_usuario")?;
+    let id_estacion = parse_optional_id(object.get("id_estacion"), "id_estacion")?;
     let operacion = parse_operacion(required_non_empty_str(
         object.get("operacion"),
         "operacion",
@@ -28,6 +29,7 @@ pub fn parse_movimiento_payload(payload: &[u8]) -> Result<MovimientoRecorrido, E
     Ok(MovimientoRecorrido {
         id_recorrido,
         id_usuario,
+        id_estacion,
         operacion,
         fechahora,
     })
@@ -53,6 +55,17 @@ fn parse_required_id(value: Option<&Value>, campo: &'static str) -> Result<u64, 
             campo,
             valor: other.to_string(),
         }),
+    }
+}
+
+fn parse_optional_id(
+    value: Option<&Value>,
+    campo: &'static str,
+) -> Result<Option<u64>, ErrorDominio> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(text)) if text.trim().is_empty() => Ok(None),
+        Some(_) => parse_required_id(value, campo).map(Some),
     }
 }
 
@@ -175,5 +188,15 @@ mod tests {
         assert_eq!(movimiento.id_recorrido, 880001);
         assert_eq!(movimiento.id_usuario, 42);
         assert_eq!(movimiento.operacion, Operacion::Retiro);
+    }
+
+    #[test]
+    fn acepta_id_estacion_opcional() {
+        let movimiento = parse_movimiento_payload(
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":"15","operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(movimiento.id_estacion, Some(15));
     }
 }

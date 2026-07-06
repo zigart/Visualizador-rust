@@ -1,0 +1,2 @@
+ALTER TABLE recorridos
+ADD COLUMN IF NOT EXISTS id_estacion BIGINT;

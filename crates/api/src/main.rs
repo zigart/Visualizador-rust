@@ -3,6 +3,7 @@
 mod dashboard;
 mod operations;
 mod settings;
+mod usuarios;
 
 use adaptadores::{
     rabbitmq::{consume_forever, RabbitMqPublisherSettings, RabbitMqSettings},
@@ -13,10 +14,12 @@ use dashboard::{publicar_movimiento_valido, DashboardState, VistaEstadoMemoria};
 use dominio::{EstadoBicicletas, Operacion};
 use operations::{ManualAuth, OperationsState, RabbitManualPublisher};
 use serde_json::Value;
+use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::broadcast};
 use tracing::{error, info};
 use tracing_subscriber::{fmt, EnvFilter};
+use usuarios::{RepositorioRecorridoPostgres, UsuariosState};
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
@@ -29,12 +32,14 @@ async fn main() -> Result<()> {
         queue: config.queue_name.clone(),
         prefetch: config.rabbit_prefetch,
     };
+    let pg_pool = PgPool::connect(&config.database_url).await?;
 
     let (broadcaster, _) = broadcast::channel(128);
     let dashboard_state = DashboardState {
         vista: Arc::new(VistaEstadoMemoria::new(EstadoBicicletas::new(0, 0))),
         broadcaster,
     };
+    let recorridos_postgres = Arc::new(RepositorioRecorridoPostgres::new(pg_pool.clone()));
     let operations_state = OperationsState {
         auth: ManualAuth {
             usuario: config.operator_user.clone(),
@@ -45,8 +50,12 @@ async fn main() -> Result<()> {
             routing_key: config.queue_name.clone(),
         })),
     };
-    let app =
-        dashboard::router(dashboard_state.clone()).merge(operations::router(operations_state));
+    let usuarios_state = UsuariosState {
+        recorridos: recorridos_postgres.clone(),
+    };
+    let app = dashboard::router(dashboard_state.clone())
+        .merge(operations::router(operations_state))
+        .merge(usuarios::router(usuarios_state));
 
     let bind: SocketAddr = config.http_bind.parse()?;
     let listener = TcpListener::bind(bind).await?;
@@ -58,9 +67,11 @@ async fn main() -> Result<()> {
     });
 
     let consumer_dashboard_state = dashboard_state.clone();
+    let consumer_recorridos = recorridos_postgres.clone();
     let consumer = tokio::spawn(async move {
         consume_forever(rabbit_settings, move |payload| {
             let dashboard_state = consumer_dashboard_state.clone();
+            let recorridos = consumer_recorridos.clone();
             async move {
                 let movimiento = match parse_movimiento_payload(&payload) {
                     Ok(movimiento) => movimiento,
@@ -86,6 +97,16 @@ async fn main() -> Result<()> {
                         operacion = %operacion,
                         error = %error,
                         "error de dominio procesando mensaje"
+                    );
+                    return Err(error);
+                }
+                if let Err(error) = recorridos.registrar_movimiento(&movimiento).await {
+                    tracing::error!(
+                        id_recorrido = movimiento.id_recorrido,
+                        id_usuario = movimiento.id_usuario,
+                        operacion = %operacion,
+                        error = %error,
+                        "error persistiendo movimiento"
                     );
                     return Err(error);
                 }

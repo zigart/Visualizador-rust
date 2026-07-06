@@ -1,6 +1,6 @@
 ## Context
 
-Tras `04-persistence` y `07-usuario-viajes`, las tablas tienen tanto columnas del contrato de movimientos (`id_recorrido`, `id_usuario`, `operacion`, `fechahora`, `id_estacion`) como columnas legacy del bootstrap inicial. El INSERT actual en `recorrido.rs` escribe 10 columnas; el contrato objetivo requiere 6 columnas de negocio mas `id` autogenerado.
+Tras `persistence-04` y `usuario-viajes-07`, las tablas tienen tanto columnas del contrato de movimientos (`id_recorrido`, `id_usuario`, `operacion`, `fechahora`, `id_estacion`) como columnas legacy del bootstrap inicial. El INSERT actual en `recorrido.rs` escribe 10 columnas; el contrato objetivo requiere 6 columnas de negocio mas `id` autogenerado.
 
 `estado_bicicletas` fue renombrada a `en_uso`/`maximo_historico` en migracion `003`, pero conserva `SMALLINT PRIMARY KEY`, constraint singleton y `updated_at`.
 

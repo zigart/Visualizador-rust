@@ -260,7 +260,7 @@ async fn rollback_no_deja_movimiento_si_falla_actualizacion_estado() {
     let movimiento = movimiento(1, 10, Operacion::Retiro, 1);
 
     let mut tx = pool.begin().await.unwrap();
-    let conn: &mut sqlx::PgConnection = &mut *tx;
+    let conn: &mut sqlx::PgConnection = &mut tx;
     recorrido::insertar_movimiento(conn, &movimiento)
         .await
         .unwrap();

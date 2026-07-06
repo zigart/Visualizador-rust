@@ -168,7 +168,7 @@ async fn websocket_session(mut socket: WebSocket, state: DashboardState) {
 
 async fn send_estado(socket: &mut WebSocket, estado: EstadoDashboard) -> Result<()> {
     let payload = serde_json::to_string(&estado)?;
-    socket.send(Message::Text(payload.into())).await?;
+    socket.send(Message::Text(payload)).await?;
     Ok(())
 }
 

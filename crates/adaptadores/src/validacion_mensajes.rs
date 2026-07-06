@@ -16,7 +16,7 @@ pub fn parse_movimiento_payload(payload: &[u8]) -> Result<MovimientoRecorrido, E
 
     let id_recorrido = parse_required_id(object.get("id_recorrido"), "id_recorrido")?;
     let id_usuario = parse_required_id(object.get("id_usuario"), "id_usuario")?;
-    let id_estacion = parse_optional_id(object.get("id_estacion"), "id_estacion")?;
+    let id_estacion = parse_required_id(object.get("id_estacion"), "id_estacion")?;
     let operacion = parse_operacion(required_non_empty_str(
         object.get("operacion"),
         "operacion",
@@ -55,17 +55,6 @@ fn parse_required_id(value: Option<&Value>, campo: &'static str) -> Result<u64, 
             campo,
             valor: other.to_string(),
         }),
-    }
-}
-
-fn parse_optional_id(
-    value: Option<&Value>,
-    campo: &'static str,
-) -> Result<Option<u64>, ErrorDominio> {
-    match value {
-        None | Some(Value::Null) => Ok(None),
-        Some(Value::String(text)) if text.trim().is_empty() => Ok(None),
-        Some(_) => parse_required_id(value, campo).map(Some),
     }
 }
 
@@ -129,7 +118,7 @@ mod tests {
     #[test]
     fn rechaza_campo_obligatorio_faltante() {
         let error = parse_movimiento_payload(
-            br#"{"id_recorrido":1,"id_usuario":1,"fechahora":"2026-06-08T15:34:20Z"}"#,
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":10,"fechahora":"2026-06-08T15:34:20Z"}"#,
         )
         .unwrap_err();
 
@@ -137,9 +126,70 @@ mod tests {
     }
 
     #[test]
+    fn rechaza_id_estacion_ausente() {
+        let error = parse_movimiento_payload(
+            br#"{"id_recorrido":1,"id_usuario":1,"operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ErrorDominio::CampoObligatorio {
+                campo: "id_estacion"
+            }
+        );
+    }
+
+    #[test]
+    fn rechaza_id_estacion_null() {
+        let error = parse_movimiento_payload(
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":null,"operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ErrorDominio::CampoObligatorio {
+                campo: "id_estacion"
+            }
+        );
+    }
+
+    #[test]
+    fn rechaza_id_estacion_vacio() {
+        let error = parse_movimiento_payload(
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":"","operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ErrorDominio::CampoObligatorio {
+                campo: "id_estacion"
+            }
+        );
+    }
+
+    #[test]
+    fn rechaza_id_estacion_no_numerico() {
+        let error = parse_movimiento_payload(
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":"abc","operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ErrorDominio::ValorInvalido {
+                campo: "id_estacion",
+                valor: "abc".to_string(),
+            }
+        );
+    }
+
+    #[test]
     fn rechaza_operacion_invalida() {
         let error = parse_movimiento_payload(
-            br#"{"id_recorrido":1,"id_usuario":1,"operacion":"X","fechahora":"2026-06-08T15:34:20Z"}"#,
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":10,"operacion":"X","fechahora":"2026-06-08T15:34:20Z"}"#,
         )
         .unwrap_err();
 
@@ -155,7 +205,7 @@ mod tests {
     #[test]
     fn rechaza_fecha_vacia() {
         let error = parse_movimiento_payload(
-            br#"{"id_recorrido":1,"id_usuario":1,"operacion":"retiro","fechahora":""}"#,
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":10,"operacion":"retiro","fechahora":""}"#,
         )
         .unwrap_err();
 
@@ -165,7 +215,7 @@ mod tests {
     #[test]
     fn rechaza_fecha_no_parseable() {
         let error = parse_movimiento_payload(
-            br#"{"id_recorrido":1,"id_usuario":1,"operacion":"retiro","fechahora":"ayer"}"#,
+            br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":10,"operacion":"retiro","fechahora":"ayer"}"#,
         )
         .unwrap_err();
 
@@ -181,22 +231,23 @@ mod tests {
     #[test]
     fn acepta_ids_como_string_numerico() {
         let movimiento = parse_movimiento_payload(
-            br#"{"id_recorrido":"880001","id_usuario":"42","operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
+            br#"{"id_recorrido":"880001","id_usuario":"42","id_estacion":"10","operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
         )
         .unwrap();
 
         assert_eq!(movimiento.id_recorrido, 880001);
         assert_eq!(movimiento.id_usuario, 42);
+        assert_eq!(movimiento.id_estacion, 10);
         assert_eq!(movimiento.operacion, Operacion::Retiro);
     }
 
     #[test]
-    fn acepta_id_estacion_opcional() {
+    fn acepta_id_estacion_como_string_numerico() {
         let movimiento = parse_movimiento_payload(
             br#"{"id_recorrido":1,"id_usuario":1,"id_estacion":"15","operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}"#,
         )
         .unwrap();
 
-        assert_eq!(movimiento.id_estacion, Some(15));
+        assert_eq!(movimiento.id_estacion, 15);
     }
 }

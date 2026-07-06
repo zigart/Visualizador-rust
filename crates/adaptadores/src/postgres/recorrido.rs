@@ -164,7 +164,7 @@ where
     let operacion = operacion_texto(movimiento.operacion);
     let id_recorrido = movimiento.id_recorrido as i32;
     let id_usuario = movimiento.id_usuario as i32;
-    let id_estacion = movimiento.id_estacion.map(|id| id as i64);
+    let id_estacion = movimiento.id_estacion as i64;
 
     sqlx::query(
         r#"
@@ -192,12 +192,12 @@ where
 
 fn movimiento_desde_fila(row: PgRow) -> anyhow::Result<MovimientoRecorrido> {
     let operacion: String = row.try_get("operacion")?;
-    let id_estacion: Option<i64> = row.try_get("id_estacion")?;
+    let id_estacion: i64 = row.try_get("id_estacion")?;
 
     Ok(MovimientoRecorrido {
         id_recorrido: row.try_get::<i32, _>("id_recorrido")? as u64,
         id_usuario: row.try_get::<i32, _>("id_usuario")? as u64,
-        id_estacion: id_estacion.map(|id| id as u64),
+        id_estacion: id_estacion as u64,
         operacion: match operacion.as_str() {
             "retiro" => Operacion::Retiro,
             "devolucion" => Operacion::Devolucion,

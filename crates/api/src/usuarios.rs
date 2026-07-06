@@ -148,14 +148,12 @@ pub fn armar_viajes(movimientos: Vec<MovimientoRecorrido>) -> Vec<Viaje> {
             Some(Viaje {
                 id_recorrido,
                 fecha_hora_retiro: retiro.fechahora.to_rfc3339(),
-                id_estacion_retiro: retiro.id_estacion,
+                id_estacion_retiro: Some(retiro.id_estacion),
                 fecha_hora_devolucion: viaje
                     .devolucion
                     .as_ref()
                     .map(|movimiento| movimiento.fechahora.to_rfc3339()),
-                id_estacion_devolucion: viaje
-                    .devolucion
-                    .and_then(|movimiento| movimiento.id_estacion),
+                id_estacion_devolucion: viaje.devolucion.map(|movimiento| movimiento.id_estacion),
             })
         })
         .collect::<Vec<_>>();
@@ -191,10 +189,10 @@ mod tests {
     #[tokio::test]
     async fn get_usuario_retorna_viajes_ordenados_y_campos_camel_case() {
         let repo = Arc::new(RepositorioRecorridoMemoria::default());
-        repo.registrar_movimiento(movimiento(2, 1, Some(20), Operacion::Retiro, 1));
-        repo.registrar_movimiento(movimiento(2, 1, Some(21), Operacion::Devolucion, 5));
-        repo.registrar_movimiento(movimiento(1, 1, Some(10), Operacion::Retiro, 1));
-        repo.registrar_movimiento(movimiento(1, 1, Some(11), Operacion::Devolucion, 3));
+        repo.registrar_movimiento(movimiento(2, 1, 20, Operacion::Retiro, 1));
+        repo.registrar_movimiento(movimiento(2, 1, 21, Operacion::Devolucion, 5));
+        repo.registrar_movimiento(movimiento(1, 1, 10, Operacion::Retiro, 1));
+        repo.registrar_movimiento(movimiento(1, 1, 11, Operacion::Devolucion, 3));
 
         let app = router(UsuariosState { recorridos: repo });
         let response = app
@@ -223,7 +221,7 @@ mod tests {
     #[tokio::test]
     async fn get_usuario_incluye_viaje_en_curso_con_devolucion_null() {
         let repo = Arc::new(RepositorioRecorridoMemoria::default());
-        repo.registrar_movimiento(movimiento(7, 1, Some(70), Operacion::Retiro, 1));
+        repo.registrar_movimiento(movimiento(7, 1, 70, Operacion::Retiro, 1));
 
         let app = router(UsuariosState { recorridos: repo });
         let response = app
@@ -266,7 +264,7 @@ mod tests {
     fn movimiento(
         id_recorrido: u64,
         id_usuario: u64,
-        id_estacion: Option<u64>,
+        id_estacion: u64,
         operacion: Operacion,
         dia: u32,
     ) -> MovimientoRecorrido {

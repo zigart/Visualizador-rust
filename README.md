@@ -89,7 +89,7 @@ id_recorrido INTEGER NOT NULL
 id_usuario INTEGER NOT NULL
 operacion VARCHAR(20) NOT NULL
 fechahora TIMESTAMPTZ NOT NULL
-id_estacion BIGINT NULL
+id_estacion BIGINT NOT NULL
 ```
 
 **`estado_bicicletas`**
@@ -115,7 +115,7 @@ La cola por defecto es `bike_trips`, configurable con `QUEUE_NAME`. El consumer 
 }
 ```
 
-`operacion` acepta `retiro` o `devolucion`. `id_recorrido`, `id_usuario` e `id_estacion` pueden llegar como numero o string numerico. `id_estacion` es opcional hasta cerrar el contrato final con Procesador.
+`operacion` acepta `retiro` o `devolucion`. `id_recorrido`, `id_usuario` e `id_estacion` son obligatorios y pueden llegar como numero o string numerico.
 
 ## Endpoints operativos
 

@@ -44,7 +44,7 @@ fn movimiento(
     MovimientoRecorrido {
         id_recorrido,
         id_usuario,
-        id_estacion: Some(100 + id_recorrido),
+        id_estacion: 100 + id_recorrido,
         operacion,
         fechahora: Utc.with_ymd_and_hms(2026, 7, dia, 12, 0, 0).unwrap(),
     }
@@ -237,6 +237,21 @@ async fn esquema_alineado_sin_columnas_legacy() {
             "id_estacion".to_string(),
         ]
     );
+
+    let id_estacion_nullable: String = sqlx::query_scalar(
+        r#"
+        SELECT is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'recorridos'
+          AND column_name = 'id_estacion'
+        "#,
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(id_estacion_nullable, "NO");
 }
 
 #[tokio::test]

@@ -11,6 +11,13 @@ El proyecto SHALL incluir un workspace Cargo con crates `dominio`, `adaptadores`
 - **WHEN** se ejecuta `cargo test` desde la raiz del repositorio
 - **THEN** los tests del workspace finalizan correctamente
 
+### Requirement: Separar crates por responsabilidad
+El workspace SHALL ubicar reglas de negocio en `dominio`, integraciones externas en `adaptadores` y composicion HTTP/WebSocket en `api`.
+
+#### Scenario: Dominio independiente
+- **WHEN** se compila el crate `dominio`
+- **THEN** no requiere dependencias de `axum`, `lapin` ni `sqlx`
+
 ### Requirement: Proveer servicios locales con Docker Compose
 El proyecto SHALL incluir `docker-compose.yml` con PostgreSQL y RabbitMQ configurados para desarrollo local.
 
@@ -19,7 +26,7 @@ El proyecto SHALL incluir `docker-compose.yml` con PostgreSQL y RabbitMQ configu
 - **THEN** PostgreSQL y RabbitMQ quedan disponibles para la API
 
 ### Requirement: Documentar desarrollo local
-El proyecto SHALL incluir README con instrucciones para instalar dependencias, levantar servicios, aplicar migraciones, ejecutar tests y correr la API.
+El proyecto SHALL incluir README con instrucciones para levantar servicios, aplicar migraciones, ejecutar tests y correr la API.
 
 #### Scenario: Desarrollador nuevo
 - **WHEN** un desarrollador sigue el README desde un entorno limpio

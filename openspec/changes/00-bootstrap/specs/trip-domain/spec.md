@@ -26,5 +26,5 @@ El dominio SHALL registrar una devolucion cerrando el recorrido activo de la bic
 El crate `dominio` SHALL definir traits para persistir recorridos, consultar estado de bicicletas y publicar actualizaciones sin depender de implementaciones concretas.
 
 #### Scenario: Adaptador implementa puerto
-- **WHEN** un adaptador necesita persistir estado
+- **WHEN** un adaptador necesita persistir estado o publicar actualizaciones
 - **THEN** implementa los traits definidos por `dominio`

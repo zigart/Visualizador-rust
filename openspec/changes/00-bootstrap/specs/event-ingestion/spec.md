@@ -1,15 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Consumir eventos de bicicletas desde RabbitMQ
-El sistema SHALL consumir mensajes JSON desde la cola RabbitMQ `bike_trips` representando retiros y devoluciones de bicicletas.
+El sistema SHALL consumir mensajes JSON desde RabbitMQ representando retiros y devoluciones de bicicletas.
 
 #### Scenario: Mensaje de retiro recibido
-- **WHEN** RabbitMQ entrega un mensaje valido de tipo retiro en `bike_trips`
-- **THEN** el sistema procesa el retiro mediante el puerto de aplicacion correspondiente
+- **WHEN** RabbitMQ entrega un mensaje valido de tipo retiro
+- **THEN** el sistema procesa el retiro mediante el servicio de dominio correspondiente
 
 #### Scenario: Mensaje de devolucion recibido
-- **WHEN** RabbitMQ entrega un mensaje valido de tipo devolucion en `bike_trips`
-- **THEN** el sistema procesa la devolucion mediante el puerto de aplicacion correspondiente
+- **WHEN** RabbitMQ entrega un mensaje valido de tipo devolucion
+- **THEN** el sistema procesa la devolucion mediante el servicio de dominio correspondiente
 
 ### Requirement: Confirmar mensajes luego de procesarlos
 El sistema SHALL confirmar un mensaje RabbitMQ solo despues de aplicar reglas de negocio y persistir el cambio requerido.

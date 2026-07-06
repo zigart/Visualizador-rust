@@ -8,10 +8,11 @@ mod usuarios;
 use adaptadores::{
     rabbitmq::{consume_forever, RabbitMqPublisherSettings, RabbitMqSettings},
     validacion_mensajes::parse_movimiento_payload,
+    PersistenciaMovimientos,
 };
 use anyhow::Result;
-use dashboard::{publicar_movimiento_valido, DashboardState, VistaEstadoMemoria};
-use dominio::{EstadoBicicletas, Operacion};
+use dashboard::{publicar_estado_dashboard, DashboardState, VistaEstadoMemoria};
+use dominio::Operacion;
 use operations::{ManualAuth, OperationsState, RabbitManualPublisher};
 use serde_json::Value;
 use sqlx::PgPool;
@@ -19,7 +20,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::broadcast};
 use tracing::{error, info};
 use tracing_subscriber::{fmt, EnvFilter};
-use usuarios::{RepositorioRecorridoPostgres, UsuariosState};
+use usuarios::UsuariosState;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
@@ -33,13 +34,14 @@ async fn main() -> Result<()> {
         prefetch: config.rabbit_prefetch,
     };
     let pg_pool = PgPool::connect(&config.database_url).await?;
+    let persistencia = Arc::new(PersistenciaMovimientos::new(pg_pool));
+    let estado_inicial = persistencia.leer_estado_actual().await?;
 
     let (broadcaster, _) = broadcast::channel(128);
     let dashboard_state = DashboardState {
-        vista: Arc::new(VistaEstadoMemoria::new(EstadoBicicletas::new(0, 0))),
+        vista: Arc::new(VistaEstadoMemoria::new(estado_inicial)),
         broadcaster,
     };
-    let recorridos_postgres = Arc::new(RepositorioRecorridoPostgres::new(pg_pool.clone()));
     let operations_state = OperationsState {
         auth: ManualAuth {
             usuario: config.operator_user.clone(),
@@ -51,7 +53,7 @@ async fn main() -> Result<()> {
         })),
     };
     let usuarios_state = UsuariosState {
-        recorridos: recorridos_postgres.clone(),
+        recorridos: persistencia.clone(),
     };
     let app = dashboard::router(dashboard_state.clone())
         .merge(operations::router(operations_state))
@@ -67,11 +69,11 @@ async fn main() -> Result<()> {
     });
 
     let consumer_dashboard_state = dashboard_state.clone();
-    let consumer_recorridos = recorridos_postgres.clone();
+    let consumer_persistencia = persistencia.clone();
     let consumer = tokio::spawn(async move {
         consume_forever(rabbit_settings, move |payload| {
             let dashboard_state = consumer_dashboard_state.clone();
-            let recorridos = consumer_recorridos.clone();
+            let persistencia = consumer_persistencia.clone();
             async move {
                 let movimiento = match parse_movimiento_payload(&payload) {
                     Ok(movimiento) => movimiento,
@@ -88,28 +90,44 @@ async fn main() -> Result<()> {
                     fechahora = %movimiento.fechahora,
                     "inicio procesamiento de movimiento"
                 );
+
+                let nuevo_estado = match persistencia.persistir_movimiento(&movimiento).await {
+                    Ok(estado) => estado,
+                    Err(error) => {
+                        if error.es_error_dominio() {
+                            error!(
+                                id_recorrido = movimiento.id_recorrido,
+                                id_usuario = movimiento.id_usuario,
+                                operacion = %operacion,
+                                error = %error,
+                                "error de dominio procesando mensaje"
+                            );
+                        } else {
+                            tracing::error!(
+                                id_recorrido = movimiento.id_recorrido,
+                                id_usuario = movimiento.id_usuario,
+                                operacion = %operacion,
+                                error = %error,
+                                "error persistiendo movimiento"
+                            );
+                        }
+                        return Err(error.into());
+                    }
+                };
+
                 if let Err(error) =
-                    publicar_movimiento_valido(&dashboard_state, movimiento.clone()).await
+                    publicar_estado_dashboard(&dashboard_state, movimiento.clone(), nuevo_estado)
+                        .await
                 {
-                    error!(
-                        id_recorrido = movimiento.id_recorrido,
-                        id_usuario = movimiento.id_usuario,
-                        operacion = %operacion,
-                        error = %error,
-                        "error de dominio procesando mensaje"
-                    );
-                    return Err(error);
-                }
-                if let Err(error) = recorridos.registrar_movimiento(&movimiento).await {
                     tracing::error!(
                         id_recorrido = movimiento.id_recorrido,
                         id_usuario = movimiento.id_usuario,
                         operacion = %operacion,
                         error = %error,
-                        "error persistiendo movimiento"
+                        "error publicando estado dashboard"
                     );
-                    return Err(error);
                 }
+
                 info!(
                     id_recorrido = movimiento.id_recorrido,
                     id_usuario = movimiento.id_usuario,

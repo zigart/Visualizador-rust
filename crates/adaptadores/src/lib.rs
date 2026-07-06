@@ -3,3 +3,5 @@
 pub mod postgres;
 pub mod rabbitmq;
 pub mod validacion_mensajes;
+
+pub use postgres::{ErrorPersistencia, PersistenciaMovimientos};

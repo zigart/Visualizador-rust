@@ -3,17 +3,15 @@ use std::{collections::BTreeMap, future::Future, pin::Pin, sync::Arc};
 #[cfg(test)]
 use std::sync::Mutex;
 
-use anyhow::Context;
+use adaptadores::PersistenciaMovimientos;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     routing::get,
     Json, Router,
 };
-use chrono::{DateTime, Utc};
 use dominio::{MovimientoRecorrido, Operacion};
 use serde::Serialize;
-use sqlx::{postgres::PgRow, PgPool, Row};
 use tracing::error;
 
 #[derive(Clone)]
@@ -26,6 +24,15 @@ pub trait ConsultaRepositorioRecorrido: Send + Sync {
         &self,
         id_usuario: u64,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<MovimientoRecorrido>>> + Send + '_>>;
+}
+
+impl ConsultaRepositorioRecorrido for PersistenciaMovimientos {
+    fn listar_movimientos_por_usuario(
+        &self,
+        id_usuario: u64,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<MovimientoRecorrido>>> + Send + '_>> {
+        self.consulta_listar_movimientos(id_usuario)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -59,92 +66,6 @@ impl ConsultaRepositorioRecorrido for RepositorioRecorridoMemoria {
                 .filter(|movimiento| movimiento.id_usuario == id_usuario)
                 .cloned()
                 .collect())
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RepositorioRecorridoPostgres {
-    pool: PgPool,
-}
-
-impl RepositorioRecorridoPostgres {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn registrar_movimiento(
-        &self,
-        movimiento: &MovimientoRecorrido,
-    ) -> anyhow::Result<()> {
-        let operacion = operacion_texto(movimiento.operacion);
-        let id_recorrido = movimiento.id_recorrido as i64;
-        let id_usuario = movimiento.id_usuario as i64;
-        let id_estacion = movimiento.id_estacion.map(|id| id as i64);
-        let estacion = id_estacion
-            .map(|id| id.to_string())
-            .unwrap_or_else(|| "sin-estacion".to_string());
-        let finalizado_en =
-            (movimiento.operacion == Operacion::Devolucion).then_some(movimiento.fechahora);
-
-        sqlx::query(
-            r#"
-            INSERT INTO recorridos (
-                bicicleta_id,
-                estacion_origen_id,
-                estacion_destino_id,
-                iniciado_en,
-                finalizado_en,
-                id_recorrido,
-                id_usuario,
-                operacion,
-                fechahora,
-                id_estacion
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $4, $9)
-            "#,
-        )
-        .bind(id_recorrido.to_string())
-        .bind(estacion)
-        .bind(Option::<String>::None)
-        .bind(movimiento.fechahora)
-        .bind(finalizado_en)
-        .bind(id_recorrido)
-        .bind(id_usuario)
-        .bind(operacion)
-        .bind(id_estacion)
-        .execute(&self.pool)
-        .await
-        .context("no se pudo registrar movimiento en recorridos")?;
-
-        Ok(())
-    }
-}
-
-impl ConsultaRepositorioRecorrido for RepositorioRecorridoPostgres {
-    fn listar_movimientos_por_usuario(
-        &self,
-        id_usuario: u64,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<MovimientoRecorrido>>> + Send + '_>> {
-        Box::pin(async move {
-            let id_usuario = id_usuario as i64;
-            let rows = sqlx::query(
-                r#"
-                SELECT id_recorrido, id_usuario, id_estacion, operacion, fechahora
-                FROM recorridos
-                WHERE id_usuario = $1
-                  AND id_recorrido IS NOT NULL
-                  AND operacion IS NOT NULL
-                  AND fechahora IS NOT NULL
-                ORDER BY fechahora ASC
-                "#,
-            )
-            .bind(id_usuario)
-            .fetch_all(&self.pool)
-            .await
-            .context("no se pudieron listar movimientos del usuario")?;
-
-            rows.into_iter().map(movimiento_desde_fila).collect()
         })
     }
 }
@@ -200,30 +121,6 @@ async fn historial_usuario(
         Err(StatusCode::NOT_FOUND)
     } else {
         Ok(Json(ViajesResponse { viajes }))
-    }
-}
-
-fn movimiento_desde_fila(row: PgRow) -> anyhow::Result<MovimientoRecorrido> {
-    let operacion: String = row.try_get("operacion")?;
-    let id_estacion: Option<i64> = row.try_get("id_estacion")?;
-
-    Ok(MovimientoRecorrido {
-        id_recorrido: row.try_get::<i64, _>("id_recorrido")? as u64,
-        id_usuario: row.try_get::<i64, _>("id_usuario")? as u64,
-        id_estacion: id_estacion.map(|id| id as u64),
-        operacion: match operacion.as_str() {
-            "retiro" => Operacion::Retiro,
-            "devolucion" => Operacion::Devolucion,
-            otro => anyhow::bail!("operacion invalida en recorridos: {otro}"),
-        },
-        fechahora: row.try_get::<DateTime<Utc>, _>("fechahora")?,
-    })
-}
-
-fn operacion_texto(operacion: Operacion) -> &'static str {
-    match operacion {
-        Operacion::Retiro => "retiro",
-        Operacion::Devolucion => "devolucion",
     }
 }
 

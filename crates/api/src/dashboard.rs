@@ -11,7 +11,7 @@ use axum::{
     Router,
 };
 use chrono::Utc;
-use dominio::{EstadoBicicletas, MovimientoRecorrido, Operacion};
+use dominio::{EstadoBicicletas, MovimientoRecorrido};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::{debug, warn};
@@ -25,7 +25,7 @@ pub struct DashboardState {
 pub trait VistaEstadoBicicletas: Send + Sync {
     fn estado_actual(&self) -> EstadoDashboard;
 
-    fn registrar_movimiento(&self, movimiento: MovimientoRecorrido) -> EstadoDashboard;
+    fn establecer_estado(&self, estado: EstadoBicicletas);
 }
 
 #[derive(Debug)]
@@ -39,6 +39,10 @@ impl VistaEstadoMemoria {
             estado: Mutex::new(estado),
         }
     }
+
+    pub fn actualizar_estado(&self, estado: EstadoBicicletas) {
+        *self.estado.lock().expect("estado dashboard bloqueado") = estado;
+    }
 }
 
 impl VistaEstadoBicicletas for VistaEstadoMemoria {
@@ -47,15 +51,8 @@ impl VistaEstadoBicicletas for VistaEstadoMemoria {
         EstadoDashboard::from_estado(*estado, None)
     }
 
-    fn registrar_movimiento(&self, movimiento: MovimientoRecorrido) -> EstadoDashboard {
-        let mut estado = self.estado.lock().expect("estado dashboard bloqueado");
-
-        *estado = match movimiento.operacion {
-            Operacion::Retiro => estado.registrar_retiro(),
-            Operacion::Devolucion => estado.registrar_devolucion(),
-        };
-
-        EstadoDashboard::from_estado(*estado, Some(MovimientoDashboard::from(movimiento)))
+    fn establecer_estado(&self, estado: EstadoBicicletas) {
+        self.actualizar_estado(estado);
     }
 }
 
@@ -69,7 +66,7 @@ pub struct EstadoDashboard {
 }
 
 impl EstadoDashboard {
-    fn from_estado(estado: EstadoBicicletas, movimiento: Option<MovimientoDashboard>) -> Self {
+    pub fn from_estado(estado: EstadoBicicletas, movimiento: Option<MovimientoDashboard>) -> Self {
         Self {
             bicicletas_disponibles: estado.bicicletas_disponibles(),
             bicicletas_en_uso: estado.en_uso,
@@ -108,13 +105,16 @@ pub fn router(state: DashboardState) -> Router {
         .with_state(state)
 }
 
-pub async fn publicar_movimiento_valido(
+pub async fn publicar_estado_dashboard(
     state: &DashboardState,
     movimiento: MovimientoRecorrido,
+    estado: EstadoBicicletas,
 ) -> Result<()> {
-    let estado = state.vista.registrar_movimiento(movimiento);
+    state.vista.establecer_estado(estado);
 
-    match state.broadcaster.send(estado) {
+    let payload = EstadoDashboard::from_estado(estado, Some(MovimientoDashboard::from(movimiento)));
+
+    match state.broadcaster.send(payload) {
         Ok(clientes) => debug!(clientes, "estado dashboard emitido"),
         Err(error) => warn!(error = %error, "no hay clientes WebSocket para recibir dashboard"),
     }
@@ -172,10 +172,10 @@ async fn send_estado(socket: &mut WebSocket, estado: EstadoDashboard) -> Result<
     Ok(())
 }
 
-fn operacion_label(operacion: Operacion) -> &'static str {
+fn operacion_label(operacion: dominio::Operacion) -> &'static str {
     match operacion {
-        Operacion::Retiro => "retiro",
-        Operacion::Devolucion => "devolucion",
+        dominio::Operacion::Retiro => "retiro",
+        dominio::Operacion::Devolucion => "devolucion",
     }
 }
 

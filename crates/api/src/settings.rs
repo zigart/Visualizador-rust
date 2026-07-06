@@ -8,6 +8,8 @@ pub struct AppConfig {
     pub rabbitmq_url: String,
     pub queue_name: String,
     pub rabbit_prefetch: u16,
+    pub operator_user: String,
+    pub operator_password: String,
     pub http_bind: String,
     pub app_env: String,
     pub log_format: String,
@@ -26,6 +28,8 @@ impl AppConfig {
             )?
             .set_default("queue_name", "bike_trips")?
             .set_default("rabbit_prefetch", 1)?
+            .set_default("operator_user", "visualizador")?
+            .set_default("operator_password", "visualizador")?
             .set_default("http_bind", "127.0.0.1:3000")?
             .set_default("app_env", "dev")?
             .set_default("log_format", "pretty")?

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: visualizador-api
+  labels:
+    app: visualizador-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: visualizador-api
+  template:
+    metadata:
+      labels:
+        app: visualizador-api
+    spec:
+      containers:
+        - name: api
+          image: visualizador-rust:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: HTTP_BIND
+              value: "0.0.0.0:3000"
+            - name: DATABASE_URL
+              value: "postgres://visualizador:visualizador@postgres:5432/visualizador"
+            - name: RABBITMQ_URL
+              value: "amqp://visualizador:visualizador@rabbitmq:5672/%2f"
+            - name: QUEUE_NAME
+              value: "bike_trips"
+            - name: RABBIT_PREFETCH
+              value: "1"
+            - name: OPERATOR_USER
+              value: "visualizador"
+            - name: OPERATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: visualizador-api
+                  key: operator-password
+            - name: LOG_FORMAT
+              value: "json"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3

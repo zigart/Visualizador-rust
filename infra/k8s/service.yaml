@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: visualizador-api
+  labels:
+    app: visualizador-api
+spec:
+  type: ClusterIP
+  selector:
+    app: visualizador-api
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

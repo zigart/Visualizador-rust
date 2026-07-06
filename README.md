@@ -52,6 +52,8 @@ $env:DATABASE_URL = "postgres://visualizador:visualizador@localhost:5432/visuali
 $env:RABBITMQ_URL = "amqp://visualizador:visualizador@localhost:5672/%2f"
 $env:QUEUE_NAME = "bike_trips"
 $env:RABBIT_PREFETCH = "1"
+$env:OPERATOR_USER = "visualizador"
+$env:OPERATOR_PASSWORD = "visualizador"
 $env:HTTP_BIND = "127.0.0.1:3000"
 $env:APP_ENV = "dev"
 $env:LOG_FORMAT = "pretty"
@@ -86,6 +88,42 @@ La cola por defecto es `bike_trips`, configurable con `QUEUE_NAME`. El consumer 
 ```
 
 `operacion` acepta `retiro` o `devolucion`. `id_recorrido` e `id_usuario` pueden llegar como numero o string numerico.
+
+## Endpoints operativos
+
+Health check:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/health
+```
+
+Publicacion manual a RabbitMQ:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:3000/rabbit/mensajes" `
+  -Method Post `
+  -Headers @{ "X-Usuario" = "visualizador"; "X-Contrasena" = "visualizador" } `
+  -ContentType "application/json" `
+  -Body '{"id_recorrido":1,"id_usuario":1,"operacion":"retiro","fechahora":"2026-06-08T15:34:20Z"}'
+```
+
+## Imagen Docker
+
+```powershell
+docker build -t visualizador-rust:local .
+docker run --rm -p 3000:3000 --env-file .env visualizador-rust:local
+```
+
+## Kubernetes
+
+Los manifests base estan en `infra/k8s/`:
+
+```powershell
+kubectl apply -f infra/k8s/
+```
+
+Configurar las variables `DATABASE_URL`, `RABBITMQ_URL`, `QUEUE_NAME`, `RABBIT_PREFETCH`, `OPERATOR_USER`, `OPERATOR_PASSWORD`, `HTTP_BIND` y `LOG_FORMAT` segun el entorno.
 
 ## Comandos de desarrollo
 

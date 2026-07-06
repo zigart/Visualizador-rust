@@ -4,11 +4,11 @@ use anyhow::{Context, Result};
 use futures_lite::StreamExt;
 use lapin::{
     options::{
-        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicQosOptions,
-        QueueDeclareOptions,
+        BasicAckOptions, BasicConsumeOptions, BasicNackOptions, BasicPublishOptions,
+        BasicQosOptions, QueueDeclareOptions,
     },
     types::FieldTable,
-    Connection, ConnectionProperties,
+    BasicProperties, Connection, ConnectionProperties,
 };
 use tokio::time::sleep;
 use tracing::{error, info, warn};
@@ -18,6 +18,12 @@ pub struct RabbitMqSettings {
     pub url: String,
     pub queue: String,
     pub prefetch: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RabbitMqPublisherSettings {
+    pub url: String,
+    pub routing_key: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +55,49 @@ where
             sleep(Duration::from_secs(2)).await;
         }
     }
+}
+
+pub async fn publish_message(settings: &RabbitMqPublisherSettings, payload: Vec<u8>) -> Result<()> {
+    let connection = Connection::connect(
+        &settings.url,
+        ConnectionProperties::default()
+            .with_connection_name("visualizador-manual-publisher".into()),
+    )
+    .await
+    .with_context(|| format!("no se pudo conectar a RabbitMQ en {}", settings.url))?;
+
+    let channel = connection
+        .create_channel()
+        .await
+        .context("no se pudo crear canal RabbitMQ para publicacion")?;
+
+    channel
+        .queue_declare(
+            &settings.routing_key,
+            QueueDeclareOptions {
+                durable: true,
+                ..QueueDeclareOptions::default()
+            },
+            FieldTable::default(),
+        )
+        .await
+        .with_context(|| format!("no se pudo declarar cola {}", settings.routing_key))?;
+
+    channel
+        .basic_publish(
+            "",
+            &settings.routing_key,
+            BasicPublishOptions::default(),
+            &payload,
+            BasicProperties::default().with_content_type("application/json".into()),
+        )
+        .await
+        .context("fallo publicando mensaje RabbitMQ")?
+        .await
+        .context("RabbitMQ no confirmo la publicacion")?;
+
+    info!(routing_key = %settings.routing_key, "mensaje publicado manualmente en RabbitMQ");
+    Ok(())
 }
 
 async fn consume_once<H, Fut>(settings: RabbitMqSettings, handler: H) -> Result<()>

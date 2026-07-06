@@ -60,7 +60,7 @@ where
         )
         "#,
     )
-    .bind(id_recorrido as i64)
+    .bind(id_recorrido as i32)
     .fetch_one(executor)
     .await
     .context("no se pudo verificar id_recorrido")?;
@@ -86,7 +86,7 @@ where
         ORDER BY fechahora ASC, id_recorrido ASC
         "#,
     )
-    .bind(id_usuario as i64)
+    .bind(id_usuario as i32)
     .fetch_all(executor)
     .await
     .context("no se pudieron listar movimientos del usuario")?;
@@ -115,7 +115,7 @@ where
         LIMIT 1
         "#,
     )
-    .bind(id_usuario as i64)
+    .bind(id_usuario as i32)
     .bind(fechahora)
     .fetch_optional(executor)
     .await
@@ -145,7 +145,7 @@ where
         LIMIT 1
         "#,
     )
-    .bind(id_usuario as i64)
+    .bind(id_usuario as i32)
     .bind(fechahora)
     .fetch_optional(executor)
     .await
@@ -162,40 +162,26 @@ where
     E: Executor<'e, Database = Postgres>,
 {
     let operacion = operacion_texto(movimiento.operacion);
-    let id_recorrido = movimiento.id_recorrido as i64;
-    let id_usuario = movimiento.id_usuario as i64;
+    let id_recorrido = movimiento.id_recorrido as i32;
+    let id_usuario = movimiento.id_usuario as i32;
     let id_estacion = movimiento.id_estacion.map(|id| id as i64);
-    let estacion = id_estacion
-        .map(|id| id.to_string())
-        .unwrap_or_else(|| "sin-estacion".to_string());
-    let finalizado_en =
-        (movimiento.operacion == Operacion::Devolucion).then_some(movimiento.fechahora);
 
     sqlx::query(
         r#"
         INSERT INTO recorridos (
-            bicicleta_id,
-            estacion_origen_id,
-            estacion_destino_id,
-            iniciado_en,
-            finalizado_en,
             id_recorrido,
             id_usuario,
             operacion,
             fechahora,
             id_estacion
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $4, $9)
+        VALUES ($1, $2, $3, $4, $5)
         "#,
     )
-    .bind(id_recorrido.to_string())
-    .bind(estacion)
-    .bind(Option::<String>::None)
-    .bind(movimiento.fechahora)
-    .bind(finalizado_en)
     .bind(id_recorrido)
     .bind(id_usuario)
     .bind(operacion)
+    .bind(movimiento.fechahora)
     .bind(id_estacion)
     .execute(executor)
     .await
@@ -209,8 +195,8 @@ fn movimiento_desde_fila(row: PgRow) -> anyhow::Result<MovimientoRecorrido> {
     let id_estacion: Option<i64> = row.try_get("id_estacion")?;
 
     Ok(MovimientoRecorrido {
-        id_recorrido: row.try_get::<i64, _>("id_recorrido")? as u64,
-        id_usuario: row.try_get::<i64, _>("id_usuario")? as u64,
+        id_recorrido: row.try_get::<i32, _>("id_recorrido")? as u64,
+        id_usuario: row.try_get::<i32, _>("id_usuario")? as u64,
         id_estacion: id_estacion.map(|id| id as u64),
         operacion: match operacion.as_str() {
             "retiro" => Operacion::Retiro,

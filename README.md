@@ -80,10 +80,26 @@ Con PostgreSQL levantado:
 sqlx migrate run
 ```
 
-La migracion inicial crea:
+La migracion inicial crea `recorridos` y `estado_bicicletas`. La migracion `20260706000400_align_ts_schema` alinea el esquema al contrato objetivo:
 
-- `recorridos`
-- `estado_bicicletas`, con fila singleton `id = 1` y contadores en cero
+**`recorridos`**
+```sql
+id SERIAL PRIMARY KEY
+id_recorrido INTEGER NOT NULL
+id_usuario INTEGER NOT NULL
+operacion VARCHAR(20) NOT NULL
+fechahora TIMESTAMPTZ NOT NULL
+id_estacion BIGINT NULL
+```
+
+**`estado_bicicletas`**
+```sql
+id SERIAL PRIMARY KEY
+en_uso INTEGER NOT NULL DEFAULT 0
+maximo_historico INTEGER NOT NULL DEFAULT 0
+```
+
+La fila inicial de estado usa `id = 1` con contadores en cero. Columnas legacy del bootstrap (`bicicleta_id`, `iniciado_en`, etc.) se eliminan al aplicar la migracion de alineacion.
 
 ## Formato esperado de mensajes RabbitMQ
 

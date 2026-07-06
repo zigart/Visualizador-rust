@@ -172,6 +172,74 @@ async fn rechaza_retiro_duplicado_sin_insertar() {
 }
 
 #[tokio::test]
+async fn esquema_alineado_sin_columnas_legacy() {
+    let (_container, pool) = pool_con_migraciones().await;
+
+    let columnas_legacy: Vec<String> = sqlx::query_scalar(
+        r#"
+        SELECT column_name::TEXT
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'recorridos'
+          AND column_name IN (
+              'bicicleta_id',
+              'estacion_origen_id',
+              'estacion_destino_id',
+              'iniciado_en',
+              'finalizado_en',
+              'created_at',
+              'updated_at'
+          )
+        "#,
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+
+    assert!(columnas_legacy.is_empty());
+
+    let updated_at: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT column_name::TEXT
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'estado_bicicletas'
+          AND column_name = 'updated_at'
+        "#,
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+
+    assert!(updated_at.is_none());
+
+    let columnas_recorridos: Vec<String> = sqlx::query_scalar(
+        r#"
+        SELECT column_name::TEXT
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'recorridos'
+        ORDER BY ordinal_position
+        "#,
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(
+        columnas_recorridos,
+        vec![
+            "id".to_string(),
+            "id_recorrido".to_string(),
+            "id_usuario".to_string(),
+            "operacion".to_string(),
+            "fechahora".to_string(),
+            "id_estacion".to_string(),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn rollback_no_deja_movimiento_si_falla_actualizacion_estado() {
     let (_container, pool) = pool_con_migraciones().await;
     let movimiento = movimiento(1, 10, Operacion::Retiro, 1);
@@ -182,9 +250,11 @@ async fn rollback_no_deja_movimiento_si_falla_actualizacion_estado() {
         .await
         .unwrap();
 
-    let resultado = sqlx::query("UPDATE estado_bicicletas SET en_uso = -1 WHERE id = 1")
-        .execute(conn)
-        .await;
+    let resultado = sqlx::query(
+        "INSERT INTO recorridos (id_recorrido, id_usuario, operacion, fechahora) VALUES (99, 99, 'retiro', NULL)",
+    )
+    .execute(conn)
+    .await;
     assert!(resultado.is_err());
     tx.rollback().await.unwrap();
 

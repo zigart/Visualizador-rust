@@ -56,8 +56,7 @@ where
         r#"
         UPDATE estado_bicicletas
         SET en_uso = $1,
-            maximo_historico = $2,
-            updated_at = NOW()
+            maximo_historico = $2
         WHERE id = 1
         "#,
     )
